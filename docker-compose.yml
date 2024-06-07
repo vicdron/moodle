@@ -1,0 +1,47 @@
+version: "3"
+services:
+  moodle:
+    image: vicdron/moodle:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./moodle:/var/www/html
+      - ./moodle-data:/var/www/moodledata 
+    environment:
+    # Definir variáveis de ambiente para configurações do PHP
+       - PHP_INI_MAX_INPUT_VARS=5000
+       - PHP_INI_UPLOAD_MAX_FILESIZE=200M
+       - PHP_INI_POST_MAX_SIZE=200M
+    networks:
+      - moodle_net
+
+  db:
+    image: vicdron/moodle-sqlserver2019:latest
+    ports:
+      - 1433:1433
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=senha forte
+      - cap-add=SYS_PTRACE
+    volumes:
+      - ./sqlserver:/var/opt/mssql
+    networks:
+      - moodle_net
+
+  portainer:
+    image: portainer/portainer:latest
+    container_name: portainer
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer/data:/data
+      - ./portainer/logs:/path/to/portainer/logs
+      - ./portainer/config:/path/to/portainer/config
+    restart: always
+    networks:
+      - moodle_net
+
+networks:
+  moodle_net:
+    driver: bridge
