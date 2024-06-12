@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 
+# Configura o script para sair imediatamente se um comando falhar
 set -e
+
+# Função para instalar pacotes usando apt-get
+instalar_pacotes() {
+  apt-get update
+  apt-get install -y --no-install-recommends "$@"
+}
+
+echo "Instalando dependências apt"
 
 # Pacotes necessários para a construção das extensões PHP
 BUILD_PACKAGES="gettext libcurl4-openssl-dev libfreetype6-dev libicu-dev libjpeg62-turbo-dev \
@@ -14,57 +23,41 @@ PACKAGES_POSTGRES="libpq5"
 PACKAGES_MYMARIA="libmariadb3"
 
 # Pacotes necessários para outras dependências de runtime do Moodle
-PACKAGES_RUNTIME="ghostscript libaio1 libcurl4 libgss3 libicu72 libmcrypt-dev libxml2 libxslt1.1 \
+PACKAGES_RUNTIME="ghostscript libaio1 libcurl4 libgss3 libicu67 libmcrypt-dev libxml2 libxslt1.1 \
   libzip-dev sassc unzip zip"
 
 # Pacotes necessários para o Memcached
 PACKAGES_MEMCACHED="libmemcached11 libmemcachedutil2"
 
 # Pacotes necessários para o LDAP
-PACKAGES_LDAP="libldap-2.5-0"
+PACKAGES_LDAP="libldap-2.4-2"
 
-# Atualiza os repositórios e instala as dependências necessárias
-echo "Instalando dependências apt"
-apt-get update
-apt-get install -y --no-install-recommends apt-transport-https \
-    $BUILD_PACKAGES \
-    $PACKAGES_POSTGRES \
-    $PACKAGES_MYMARIA \
-    $PACKAGES_RUNTIME \
-    $PACKAGES_MEMCACHED \
-    $PACKAGES_LDAP
+# Instala todos os pacotes necessários
+instalar_pacotes $BUILD_PACKAGES $PACKAGES_POSTGRES $PACKAGES_MYMARIA $PACKAGES_RUNTIME $PACKAGES_MEMCACHED $PACKAGES_LDAP
 
-# Instala as extensões PHP
 echo "Instalando extensões PHP"
 
-# Extensão ZIP
+# Instala a extensão ZIP
 docker-php-ext-configure zip --with-zip
 docker-php-ext-install zip
 
-# Instala extensões comuns com paralelismo
-docker-php-ext-install -j$(nproc) \
-    exif \
-    intl \
-    mysqli \
-    opcache \
-    pgsql \
-    soap \
-    xsl
+# Instala extensões PHP comuns com paralelismo
+docker-php-ext-install -j"$(nproc)" exif intl mysqli opcache pgsql soap xsl
 
-# Extensão GD
+# Configura e instala a extensão GD
 echo "Configurando e instalando extensão GD"
 docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/
-docker-php-ext-install -j$(nproc) gd
+docker-php-ext-install -j"$(nproc)" gd
 
-# Extensão LDAP
+# Configura e instala a extensão LDAP
 echo "Configurando e instalando extensão LDAP"
 docker-php-ext-configure ldap
-docker-php-ext-install -j$(nproc) ldap
+docker-php-ext-install -j"$(nproc)" ldap
 
-# Instala extensões via PECL e habilita-as
-echo "Instalando e habilitando extensões PECL: APCu, igbinary, memcached, pcov, solr, timezonedb, uuid"
-pecl install apcu igbinary memcached pcov solr timezonedb uuid
-docker-php-ext-enable apcu igbinary memcached pcov solr timezonedb uuid
+# Instala e habilita extensões via PECL
+echo "Instalando e habilitando extensões PECL: APCu, igbinary, memcached, mongodb, PCov, solr, timezonedb, uuid, XMLRPC (beta)"
+pecl install apcu igbinary memcached mongodb pcov solr timezonedb uuid xmlrpc-beta
+docker-php-ext-enable apcu igbinary memcached mongodb pcov solr timezonedb uuid xmlrpc
 
 # Habilita a CLI do APCu
 echo 'apc.enable_cli = On' >> /usr/local/etc/php/conf.d/10-docker-php-ext-apcu.ini

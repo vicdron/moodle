@@ -2,47 +2,46 @@
 
 set -e
 
-# Verifica se a plataforma alvo não é "linux/amd64" e pula a instalação se for outra arquitetura
+# Verifica se a plataforma de destino é diferente de "linux/amd64"
 if [[ ${TARGETPLATFORM} != "linux/amd64" ]]; then
-    echo "A extensão oci8 não está disponível para a arquitetura ${TARGETPLATFORM}, pulando instalação"
+    echo "Extensão Oracle não está disponível para a arquitetura ${TARGETPLATFORM}, pulando"
     exit 0
 fi
 
 echo "Baixando arquivos do Oracle"
-# URLs dos arquivos Oracle Instant Client
-URL_BASIC="https://download.oracle.com/otn_software/linux/instantclient/216000/instantclient-basic-linux.x64-21.6.0.0.0dbru.zip"
-URL_SDK="https://download.oracle.com/otn_software/linux/instantclient/216000/instantclient-sdk-linux.x64-21.6.0.0.0dbru.zip"
-URL_SQLPLUS="https://download.oracle.com/otn_software/linux/instantclient/216000/instantclient-sqlplus-linux.x64-21.6.0.0.0dbru.zip"
 
-# Diretório temporário
+# URLs dos arquivos Oracle
+ORACLE_URL_BASE="https://download.oracle.com/otn_software/linux/instantclient/216000"
+BASIC_ZIP="instantclient-basic-linux.x64-21.6.0.0.0dbru.zip"
+SDK_ZIP="instantclient-sdk-linux.x64-21.6.0.0.0dbru.zip"
+SQLPLUS_ZIP="instantclient-sqlplus-linux.x64-21.6.0.0.0dbru.zip"
+
+# Diretório temporário para download
 TMP_DIR="/tmp"
+ORACLE_DIR="/usr/local"
 
-# Baixa os arquivos Oracle Instant Client
-curl -sSL $URL_BASIC -o $TMP_DIR/instantclient-basic-linux.x64-21.6.0.0.0dbru.zip
-curl -sSL $URL_SDK -o $TMP_DIR/instantclient-sdk-linux.x64-21.6.0.0.0dbru.zip
-curl -sSL $URL_SQLPLUS -o $TMP_DIR/instantclient-sqlplus-linux.x64-21.6.0.0.0dbru.zip
+# Baixa os arquivos necessários
+curl -o "${TMP_DIR}/${BASIC_ZIP}" "${ORACLE_URL_BASE}/${BASIC_ZIP}"
+curl -o "${TMP_DIR}/${SDK_ZIP}" "${ORACLE_URL_BASE}/${SDK_ZIP}"
+curl -o "${TMP_DIR}/${SQLPLUS_ZIP}" "${ORACLE_URL_BASE}/${SQLPLUS_ZIP}"
 
-echo "Extraindo arquivos Oracle Instant Client"
-# Extrai os arquivos Oracle Instant Client
-unzip -q $TMP_DIR/instantclient-basic-linux.x64-21.6.0.0.0dbru.zip -d /usr/local/
-rm $TMP_DIR/instantclient-basic-linux.x64-21.6.0.0.0dbru.zip
+# Extrai os arquivos baixados
+unzip "${TMP_DIR}/${BASIC_ZIP}" -d "${ORACLE_DIR}"
+rm "${TMP_DIR}/${BASIC_ZIP}"
+unzip "${TMP_DIR}/${SDK_ZIP}" -d "${ORACLE_DIR}"
+rm "${TMP_DIR}/${SDK_ZIP}"
+unzip "${TMP_DIR}/${SQLPLUS_ZIP}" -d "${ORACLE_DIR}"
+rm "${TMP_DIR}/${SQLPLUS_ZIP}"
 
-unzip -q $TMP_DIR/instantclient-sdk-linux.x64-21.6.0.0.0dbru.zip -d /usr/local/
-rm $TMP_DIR/instantclient-sdk-linux.x64-21.6.0.0.0dbru.zip
+# Cria links simbólicos para facilitar o acesso
+ln -s "${ORACLE_DIR}/instantclient_21_6" "${ORACLE_DIR}/instantclient"
+ln -s "${ORACLE_DIR}/instantclient/sqlplus" /usr/bin/sqlplus
 
-unzip -q $TMP_DIR/instantclient-sqlplus-linux.x64-21.6.0.0.0dbru.zip -d /usr/local/
-rm $TMP_DIR/instantclient-sqlplus-linux.x64-21.6.0.0.0dbru.zip
-
-# Cria links simbólicos para a pasta Instant Client
-ln -s /usr/local/instantclient_21_6 /usr/local/instantclient
-ln -s /usr/local/instantclient/sqlplus /usr/bin/sqlplus
-
-echo "Instalando e habilitando a extensão oci8"
-# Instala e habilita a extensão oci8
-echo 'instantclient,/usr/local/instantclient' | pecl install oci8
+# Instala a extensão OCI8 do Oracle usando PECL e habilita-a no PHP
+echo 'instantclient,/usr/local/instantclient' | pecl install oci8-3.0.1
 docker-php-ext-enable oci8
 
-# Configurações adicionais da extensão oci8
+# Configura a extensão OCI8
 echo 'oci8.statement_cache_size = 0' >> /usr/local/etc/php/conf.d/docker-php-ext-oci8.ini
 
-echo "Instalação da extensão oci8 concluída"
+echo "Instalação e configuração da extensão OCI8 concluída"

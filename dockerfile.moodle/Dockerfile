@@ -1,4 +1,4 @@
-FROM php:8.3-apache-bookworm
+FROM php:8.0-apache-bullseye
 
 # Definindo a plataforma alvo como uma variável de ambiente para compatibilidade com diferentes plataformas
 ARG TARGETPLATFORM
@@ -32,6 +32,9 @@ RUN chmod +x /tmp/setup/sqlsrv-extension.sh && /tmp/setup/sqlsrv-extension.sh
 # Criando diretórios necessários para o Moodle e ajustando permissões
 RUN mkdir -p /var/www/moodledata /var/www/phpunitdata /var/www/behatdata /var/www/behatfaildumps && \
     chown www-data:www-data /var/www/moodledata /var/www/phpunitdata /var/www/behatdata /var/www/behatfaildumps
+
+# Copia o arquivo de configuração personalizado
+COPY custom-php.ini /usr/local/etc/php/conf.d/
 
 # Corrigindo permissões do diretório /tmp, usado pelo PHP para uploads temporários
 RUN chmod 777 /tmp && chmod +t /tmp
