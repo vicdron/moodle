@@ -2,48 +2,51 @@
 
 set -e
 
-# Verifica se a plataforma de destino é diferente de "linux/amd64"
 if [[ ${TARGETPLATFORM} != "linux/amd64" ]]; then
-    echo "A extensão sqlsrv não está disponível para a arquitetura ${TARGETPLATFORM}, pulando"
-    exit 0
+  echo "sqlsrv extension not available for ${TARGETPLATFORM} architecture, skipping"
+  exit 0
 fi
 
-# Pacotes necessários para a construção da extensão sqlsrv
-BUILD_PACKAGES="gnupg unixodbc-dev"
-
-# Pacotes necessários para o runtime do sqlsrv
+# Pacotes necessários para a compilação e runtime
+BUILD_PACKAGES="gnupg unixodbc-dev curl lsb-release"
 PACKAGES_SQLSRV="unixodbc"
 
-echo "Instalando dependências apt"
-
-# Instala os pacotes necessários
+echo "Instalando dependências base do apt"
 apt-get update
 apt-get install -y --no-install-recommends apt-transport-https $BUILD_PACKAGES $PACKAGES_SQLSRV
 
-# Instala as dependências da Microsoft para sqlsrv
-echo "Baixando e configurando os arquivos do sqlsrv"
-curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-curl https://packages.microsoft.com/config/debian/11/prod.list -o /etc/apt/sources.list.d/mssql-release.list
+# Instala as dependências da Microsoft para o SQL Server
+echo "Adicionando o repositório da Microsoft para Debian 12 (Bookworm)"
+
+# Adiciona a chave GPG da Microsoft
+curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/keyrings/microsoft.gpg
+chmod 644 /etc/apt/keyrings/microsoft.gpg
+
+# Repositório oficial para Debian 12
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
+    > /etc/apt/sources.list.d/mssql-release.list
+
 apt-get update
 
-echo "Instalando msodbcsql"
-ACCEPT_EULA=Y apt-get install -y msodbcsql17
+# Instala a versão 17 do driver ODBC
+echo "Instalando drivers da Microsoft (msodbcsql17) e ferramentas (mssql-tools)"
+ACCEPT_EULA=Y apt-get install -y msodbcsql17 mssql-tools
 
-# Cria links simbólicos para as ferramentas do mssql
-ln -fsv /opt/mssql-tools/bin/* /usr/bin
+# Criando symlinks para as ferramentas de linha de comando
+echo "Criando symlinks para as ferramentas de linha de comando"
+ln -fsv /opt/mssql-tools/bin/* /usr/bin/
 
-# Instala a extensão sqlsrv do PHP usando PECL e habilita-a
-# É necessário usar a versão 5.9 (ou posterior) para suporte ao PHP 8.0
-echo "Instalando e habilitando a extensão sqlsrv"
-pecl install sqlsrv-5.11.0
-docker-php-ext-enable sqlsrv
+# Instala as extensões PHP via PECL (versão compatível com PHP 8.2)
+echo "Instalando extensões PHP: sqlsrv e pdo_sqlsrv"
+pecl install sqlsrv-5.11.1
+pecl install pdo_sqlsrv-5.11.1
 
-# Limpa o cache do PECL e remove pacotes de construção para reduzir o tamanho da imagem
-echo "Limpando cache e removendo pacotes de construção"
+docker-php-ext-enable sqlsrv pdo_sqlsrv
+
+# Limpa o cache para reduzir o tamanho da imagem
+echo "Limpando o ambiente de build"
 pecl clear-cache
 apt-get remove --purge -y $BUILD_PACKAGES
 apt-get autoremove -y
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-
-echo "Instalação e configuração da extensão sqlsrv concluída"
